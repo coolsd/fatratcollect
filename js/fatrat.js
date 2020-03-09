@@ -53,6 +53,38 @@
         }, '.list-spider-progress-bar', '.list-spider-run-button');
     });
 
+    // 全站采集
+    $('.all-spider-run-button').on('click', function(){
+        if(!confirm("全站采集马上开始, 请耐心等待...")){
+            return;
+        }
+
+        var option_id = $(this).attr('data-id');
+
+        ajax_collect_request_tool(request_url, {
+            action_func: 'all_page',
+            option_id: option_id,
+        }, '.all-spider-progress-bar', '.all-spider-run-button');
+    });
+
+    // 关键字采集
+    $('.keyword-spider-run-button').on('click', function(){
+        if(!confirm("关键字采集马上开始, 请耐心等待...")){
+            return;
+        }
+
+        var option_id = $(this).attr('data-id');
+        var keyword_name = $('input[name=keyword_name]').val();
+        var keyword_number = $('input[name=keyword_number]').val();
+
+        ajax_collect_request_tool(request_url, {
+            action_func: 'keyword_page',
+            option_id: option_id,
+            keyword_name: keyword_name,
+            keyword_number: keyword_number,
+        }, '.keyword-spider-progress-bar', '.keyword-spider-run-button');
+    });
+
     // 历史文章
     $('.history-page-spider-run-button').on('click', function(){
         if(!confirm("请核实输入信息.")){
@@ -265,13 +297,11 @@
     });
 
     $('input[type=radio][name=collect_type]').change(function () {
-        if (this.value == 'list') {
-            $('.collect_type_radio_change').show();
-            console.log(1);
-        }
-        else if (this.value == 'single') {
+        if (this.value == 'single') {
             $('.collect_type_radio_change').hide();
-            console.log(2);
+        }
+        else {
+            $('.collect_type_radio_change').show();
         }
     });
 

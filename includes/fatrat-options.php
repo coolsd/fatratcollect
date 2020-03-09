@@ -146,7 +146,21 @@ class FRC_Configuration_List_Table extends WP_List_Table
                 return esc_html($item[$column_name]);
                 break;
             case 'collect_type' :
-                return $item[$column_name] == 'list' ? esc_html('列表') : esc_html('详情') ;
+                switch ($item[$column_name]){
+                    case 'list':
+                        return esc_html('列表');
+                        break;
+                    case 'single':
+                        return esc_html('详情');
+                        break;
+                    case 'all':
+                        return esc_html('全站采集');
+                        break;
+                    case 'keyword':
+                        return esc_html('关键字采集');
+                        break;
+
+                }
                 break;
             case 'collect_name':
                 $edit_url = admin_url('admin.php?page=frc-options-add-edit&option_id=' . $item['id']);
@@ -307,7 +321,7 @@ class FRC_Configuration_List_Table extends WP_List_Table
         $option_id                  = !empty($_REQUEST['option_id']) ? sanitize_text_field($_REQUEST['option_id']) : null;
         $collect_name               = !empty($_REQUEST['collect_name']) ? sanitize_text_field($_REQUEST['collect_name']) : '';
         $collect_describe           = !empty($_REQUEST['collect_describe']) ? sanitize_text_field($_REQUEST['collect_describe']) : '胖鼠: 此配置天下无敌';
-        $collect_type               = !empty($_REQUEST['collect_type']) ? (in_array(sanitize_text_field($_REQUEST['collect_type']), ['list', 'single']) ? sanitize_text_field($_REQUEST['collect_type']) : 'list') : '';
+        $collect_type               = !empty($_REQUEST['collect_type']) ? (in_array(sanitize_text_field($_REQUEST['collect_type']), ['list', 'single', 'all', 'keyword']) ? sanitize_text_field($_REQUEST['collect_type']) : 'list') : '';
         $collect_remove_outer_link  = !empty($_REQUEST['collect_remove_outer_link']) ? (sanitize_text_field($_REQUEST['collect_remove_outer_link']) == 1 ? 1 : 0) : 1;
         $collect_remove_head        = !empty($_REQUEST['collect_remove_head']) ? ( sanitize_text_field($_REQUEST['collect_remove_head']) == 1 ? 1 : 0 ) : 0;
         $collect_list_url           = !empty($_REQUEST['collect_list_url']) ? sanitize_text_field( $_REQUEST['collect_list_url'] ) : '';

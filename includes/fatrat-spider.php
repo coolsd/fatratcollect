@@ -9,6 +9,7 @@
  * @CreateTime: 2018年12月30日 02:24
  */
 
+use Illuminate\Support\Str;
 use QL\QueryList;
 use GuzzleHttp\Exception\RequestException;
 
@@ -143,6 +144,52 @@ class FRC_Spider
 
 
     /**
+     * 全站采集
+     * @return array
+     */
+    public function grab_all_page()
+    {
+        $option_id = !empty($_REQUEST['option_id']) ? sanitize_text_field($_REQUEST['option_id']) : 0;
+
+        $option = $this->get_option($option_id);
+        if (!$option) {
+            return ['code' => FRC_Api_Error::FAIL, 'msg' => '未查询到配置, 配置ID错误'];
+        }
+
+        if ($this->run_spider_all_page($option)) {
+            return ['code' => FRC_Api_Error::SUCCESS, 'msg' => 'ok.'];
+        } else {
+            return ['code' => FRC_Api_Error::FAIL, 'msg' => 'System Error.'];
+        }
+    }
+
+
+    /**
+     * 关键字采集
+     * @return array
+     */
+    public function grab_keyword_page()
+    {
+        $option_id = !empty($_REQUEST['option_id']) ? sanitize_text_field($_REQUEST['option_id']) : 0;
+        $keyword_name = !empty($_REQUEST['keyword_name']) ? sanitize_text_field($_REQUEST['keyword_name']) : '';
+        $keyword_number = !empty($_REQUEST['keyword_number']) ? sanitize_text_field($_REQUEST['keyword_number']) : 10;
+
+        $option = $this->get_option($option_id);
+        if (!$option) {
+            return ['code' => FRC_Api_Error::FAIL, 'msg' => '未查询到配置, 配置ID错误'];
+        }
+
+        $option['collect_name'] = $keyword_name;
+        $option['collect_number'] = $keyword_number;
+        if ($this->run_spider_keyword_page($option)) {
+            return ['code' => FRC_Api_Error::SUCCESS, 'msg' => 'ok.'];
+        } else {
+            return ['code' => FRC_Api_Error::FAIL, 'msg' => 'System Error.'];
+        }
+    }
+
+
+    /**
      * 抓取详情
      * @return array
      */
@@ -229,6 +276,174 @@ class FRC_Spider
                 return true;
             }
             return false;
+        });
+
+        $articles->map(function ($article) use ($option) {
+            if ($article != false && !empty($article['title']) && !empty($article['content'])) {
+                $data['title'] = $this->text_keyword_replace($article['title'], $option['id']);
+                $data['content'] = $this->text_keyword_replace($article['content'], $option['id']);
+                $data['image'] = isset($article['image']) ? $article['image'] : '';
+                $data['post_type'] = $option['id'];
+                $data['link'] = $article['link'];
+                $data['author'] = get_current_user_id();
+                $data['created'] = date('Y-m-d H:i:s');
+                if ($this->wpdb->insert($this->table_post, $data)){
+                    $this->download_img($article['download_img']);
+                }
+            }
+        });
+
+        return true;
+    }
+
+    /**
+     * TODO 此函数抽空优化
+     * @param $option
+     * @return bool
+     */
+    public function run_spider_all_page($option)
+    {
+        // TODO 错误信息再优化
+        if ($option['collect_type'] != 'all'){
+            return false;
+        }
+
+        $articles = $this->_QueryList($option['collect_list_url'], $option['collect_remove_head'])
+            ->encoding('UTF-8')
+            ->find('a')->attrs('href')->filter(function ($item) use ($option){
+                if ($item === null){
+                    return false;
+                }
+                if (preg_match($option['collect_list_range'], $item, $matches)){
+                    return $item;
+                }
+            });
+
+        foreach($articles as &$article){
+            $article = $this->urlFormat($article, $option['collect_list_url']);
+        }
+
+        $string = implode("','", $articles->values()->toArray());
+        $last_sign_array = array_column($this->wpdb->get_results(
+            "select link as `sign` from $this->table_post where `link` in ('{$string}') order by id desc",
+            ARRAY_A
+        ), 'sign');
+
+        $articles = $articles->map(function ($item) use ($option, $last_sign_array){
+            if (in_array($item, $last_sign_array)){
+                return false;
+            }
+
+            try {
+                $ql = $this->_QueryList($item, $option['collect_remove_head'])
+                    ->range($option['collect_content_range'])
+                    ->encoding('UTF-8')
+                    ->rules( $this->rulesFormat($option['collect_content_rules']) )
+                    ->queryData();
+            } catch (RequestException $e) {
+                return false;
+            }
+
+            $ql = current($ql);
+            $ql['link'] = $item;
+            $article = $ql;
+            $article = $this->matching_img($article);
+
+            return $article;
+        });
+
+        $articles->map(function ($article) use ($option) {
+            if ($article != false && !empty($article['title']) && !empty($article['content'])) {
+                $data['title'] = $this->text_keyword_replace($article['title'], $option['id']);
+                $data['content'] = $this->text_keyword_replace($article['content'], $option['id']);
+                $data['image'] = isset($article['image']) ? $article['image'] : '';
+                $data['post_type'] = $option['id'];
+                $data['link'] = $article['link'];
+                $data['author'] = get_current_user_id();
+                $data['created'] = date('Y-m-d H:i:s');
+                if ($this->wpdb->insert($this->table_post, $data)){
+                    $this->download_img($article['download_img']);
+                }
+            }
+        });
+
+        return true;
+    }
+
+    /**
+     * TODO 此函数抽空优化
+     * @param $option
+     * @return bool
+     */
+    public function run_spider_keyword_page($option)
+    {
+        // TODO 错误信息再优化
+        if ($option['collect_type'] != 'keyword'){
+            return false;
+        }
+
+        if ($option['collect_remove_head'] == '1'){
+            $ql = QueryList::range($option['collect_list_range'])
+                ->encoding('UTF-8')
+                ->removeHead()
+                ->rules($this->rulesFormat($option['collect_list_rules']));
+        } else {
+            $ql = QueryList::range($option['collect_list_range'])
+                ->encoding('UTF-8')
+                ->rules($this->rulesFormat($option['collect_list_rules']));
+        }
+
+        $articles = collect();
+        $page = 1;
+        $option['collect_list_url'] = str_replace('{keyword}', $option['collect_name'], $option['collect_list_url']);
+        while (true){
+            $url = str_replace('{page}', $page, $option['collect_list_url']);
+
+            $articles_tmp = $ql->get($url)->query()->getData();
+
+            if ($articles_tmp->count() == 0){
+                break;
+            }
+
+            // 滤重
+            foreach ($articles_tmp as $key => $article_tmp){
+                $article_tmp['link'] = $this->urlFormat($article_tmp['link'], $option['collect_list_url']);
+                $res = $this->wpdb->get_results(
+                    "select link from $this->table_post where `link` = '{$article_tmp['link']}' ",
+                    ARRAY_A
+                );
+                if (!empty($res)){
+                    unset($articles_tmp[$key]);
+                }
+            }
+
+            $articles = $articles->merge($articles_tmp);
+
+            if ($articles->count() > $option['collect_number']){
+                $articles = $articles->slice(0, $option['collect_number']);
+                break;
+            }
+
+            $page++;
+        }
+
+        $articles = $articles->map(function ($item) use ($option){
+            try {
+                $ql = $this->_QueryList($item['link'], $option['collect_remove_head'])
+                    ->range($option['collect_content_range'])
+                    ->encoding('UTF-8')
+                    ->rules( $this->rulesFormat($option['collect_content_rules']) )
+                    ->queryData();
+            } catch (RequestException $e) {
+                return false;
+            }
+
+            $ql = current($ql);
+            $ql['link'] = $item['link'];
+            $article = $ql;
+            $article = $this->matching_img($article);
+
+            return $article;
         });
 
         $articles->map(function ($article) use ($option) {
@@ -353,6 +568,26 @@ class FRC_Spider
         $article['download_img'] = $images;
 
         return $article;
+    }
+
+    private function urlFormat($url, $domain){
+
+        if (empty($url) || empty($domain)){
+            return $url;
+        }
+
+        if (Str::startsWith($url, "http://") ||
+            Str::startsWith($url, "https://")){
+            return $url;
+        }
+
+        if (Str::startsWith($url, "//")){
+            return 'http:'.$url;
+        }
+
+        $domainFormat = parse_url($domain);
+
+        return $domainFormat['scheme'].'://'.$domainFormat['host'].'/'.ltrim($url, '/');
     }
 
 
@@ -533,6 +768,8 @@ function frc_spider()
                 <li><a href="#single_js" data-toggle="tab">简书爬虫</a></li>
                 <li><a href="#list" data-toggle="tab">列表爬虫</a></li>
                 <li><a href="#historypage" data-toggle="tab">列表爬虫->分页数据爬取</a></li>
+                <li><a href="#all" data-toggle="tab">全站采集</a></li>
+                <li><a href="#keyword" data-toggle="tab">关键词采集</a></li>
                 <li><a href="#details" data-toggle="tab">详情爬虫</a></li>
                 <li><a href="#autospider" data-toggle="tab">自动爬虫</a></li>
             </ul>
@@ -612,6 +849,87 @@ function frc_spider()
                         <p></p>
                         <div class="progress progress-striped active">
                             <div id="bootstrop-progress-bar" class="progress-bar progress-bar-success list-spider-progress-bar" role="progressbar"
+                                 aria-valuenow="60" aria-valuemin="0" aria-valuemax="100"
+                                 style="width: 0%;">
+                                <span class="sr-only">90% 完成（成功）</span>
+                            </div>
+                        </div>
+                    </ul>
+                    <?php } ?>
+                </div>
+<!--                全站采集-->
+                <div class="tab-pane fade spider-tab-content" id="all">
+                    <?php
+                    if (!isset($options['all'])) {
+                        echo '<p></p>';
+                        echo "<h4><a href='". admin_url('admin.php?page=frc-options') ."'>亲爱的皮皮虾: 目前没有任何一个列表配置。皮皮虾我们走 </a></h4>";
+                    } else {
+                    ?>
+                    <ul class="list-group">
+                        <p></p>
+                        <a disabled class="list-group-item active">
+                            <h5 class="list-group-item-heading">
+                                全站采集
+                            </h5>
+                        </a>
+                        <p></p>
+                        <?php
+                        foreach ($options['all'] as $option) {
+                            echo "<a href='#' data-id='{$option['id']}' class='all-spider-run-button list-group-item'>{$option['collect_name']}</a>";
+                        }
+                        ?>
+                        <!-- bootstrap进度条 -->
+                        <p></p>
+                        <div class="progress progress-striped active">
+                            <div id="bootstrop-progress-bar" class="progress-bar progress-bar-success all-spider-progress-bar" role="progressbar"
+                                 aria-valuenow="60" aria-valuemin="0" aria-valuemax="100"
+                                 style="width: 0%;">
+                                <span class="sr-only">90% 完成（成功）</span>
+                            </div>
+                        </div>
+                    </ul>
+                    <?php } ?>
+                </div>
+<!--                关键词采集-->
+                <div class="tab-pane fade spider-tab-content" id="keyword">
+                    <?php
+                    if (!isset($options['keyword'])) {
+                        echo '<p></p>';
+                        echo "<h4><a href='". admin_url('admin.php?page=frc-options') ."'>亲爱的皮皮虾: 目前没有任何一个列表配置。皮皮虾我们走 </a></h4>";
+                    } else {
+                    ?>
+                    <h4>关键字采集</h4>
+                    <table class="form-table">
+                        <tr>
+                            <th>关键字</th>
+                            <td>
+                                <input name="keyword_name" size="82" placeholder="读书" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>采集数量</th>
+                            <td>
+                                <input name="keyword_number" size="82" placeholder="30" />
+                            </td>
+                        </tr>
+                    </table>
+                    <ul class="list-group">
+                        <p></p>
+                        <a disabled class="list-group-item active">
+                            <h5 class="list-group-item-heading">
+                                请选择配置
+                            </h5>
+                        </a>
+                        <p></p>
+                        <?php
+                        foreach ($options['keyword'] as $option) {
+                            echo "<a href='#' data-id='{$option['id']}' class='keyword-spider-run-button list-group-item'>{$option['collect_name']}</a>";
+                        }
+                        ?>
+                        <!-- bootstrap进度条 -->
+                        <p></p>
+                        <div class="progress progress-striped active">
+                            <div id="bootstrop-progress-bar" class="progress-bar progress-bar-success keyword-spider-progress-bar" role="progressbar"
                                  aria-valuenow="60" aria-valuemin="0" aria-valuemax="100"
                                  style="width: 0%;">
                                 <span class="sr-only">90% 完成（成功）</span>

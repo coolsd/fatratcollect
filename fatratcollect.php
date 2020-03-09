@@ -125,7 +125,7 @@ function frc_loading_assets( $hook ) {
         // js
         wp_register_script('fat-rat-bootstrap-js', plugins_url('js/bootstrap.min.js', __FILE__));
         wp_enqueue_script('fat-rat-bootstrap-js');
-        wp_register_script('fat-rat-js', plugins_url('js/fatrat.js', __FILE__), array('jquery'), '1.0.0', true);
+        wp_register_script('fat-rat-js', plugins_url('js/fatrat.js?a=2', __FILE__), array('jquery'), '1.0.0', true);
         wp_enqueue_script('fat-rat-js');
     }
 }

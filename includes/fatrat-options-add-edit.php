@@ -22,14 +22,15 @@ function frc_options_add_edit()
         $option['collect_keywords_replace_rule'] = str_replace(" ", "\n", $option['collect_keywords_replace_rule']);
 
         $rule_link = $rule_title = $rule_content = [];
-        list($rule_link['a'], $item) = $option['collect_type'] == 'list' ? explode('%', $option['collect_list_rules']) : ['link', ''];
-        list($rule_link['b'], $rule_link['c'], $rule_link['d'],) = $option['collect_type'] == 'list' ? explode('|', $item) : ['', '', ''];
+        list($rule_link['a'], $item) = in_array($option['collect_type'], ['list', 'all', 'keyword']) ? explode('%', $option['collect_list_rules']) : ['link', ''];
+        list($rule_link['b'], $rule_link['c'], $rule_link['d'],) = in_array($option['collect_type'], ['list', 'all', 'keyword']) ? explode('|', $item) : ['', '', ''];
         list($tmp_title, $tmp_content) = explode(')(', $option['collect_content_rules']);
         list($rule_title['a'], $item) = explode('%', $tmp_title);
         list($rule_title['b'], $rule_title['c'], $rule_title['d'],) = explode('|', $item);
         list($rule_content['a'], $item) = explode('%', $tmp_content);
         list($rule_content['b'], $rule_content['c'], $rule_content['d'],) = explode('|', $item);
 
+        $rule_link['b'] == 'null' && $rule_link['b'] = null;
         $rule_link['d'] == 'null' && $rule_link['d'] = null;
         $rule_title['d'] == 'null' && $rule_title['d'] = null;
         $rule_content['d'] == 'null' && $rule_content['d'] = null;
@@ -68,6 +69,13 @@ function frc_options_add_edit()
                     <input type="radio" name="collect_type"
                            value="single" <?php echo isset($option) ? ($option['collect_type'] == 'single' ? 'checked' : '') : '' ?> >
                     详情配置
+                    <input type="radio" name="collect_type"
+                           value="all" <?php echo isset($option) ? ($option['collect_type'] == 'all' ? 'checked' : '') : '' ?> >
+                    全站采集
+                    <input type="radio" name="collect_type"
+                           value="keyword" <?php echo isset($option) ? ($option['collect_type'] == 'keyword' ? 'checked' : '') : '' ?> >
+                    关键字采集
+
                     <p>列表可直接写采集地址. 详情只写规则, 采集地址在使用的时候填写即可.</p>
                 </td>
             </tr>
@@ -104,7 +112,7 @@ function frc_options_add_edit()
                 </td>
             </tr>
             <tr class="collect_type_radio_change">
-                <th>采集范围:</th>
+                <th>采集范围/全站正则:</th>
                 <td><input type="text" size="82"
                            value="<?php echo isset($option) ? $option['collect_list_range'] : ''; ?>"
                            name="collect_list_range" />*
@@ -125,7 +133,7 @@ function frc_options_add_edit()
                             name="collect_list_rule_link_c"/>-<input type="text" size="40"
                                                                      value="<?php echo isset($option) ? $rule_link['d'] : ''; ?>"
                                                                      name="collect_list_rule_link_d"/>*
-                    <p>通过列表页 我们只取详情页的url链接即可</p>
+                    <p>全站采集模式下不填</p>
                 </td>
             </tr>
             <tr>
