@@ -314,7 +314,8 @@ class FRC_Spider
                 if ($item === null){
                     return false;
                 }
-                if (preg_match($option['collect_list_range'], $item, $matches)){
+                $pattern = '/'.str_replace('/', '\/', $option['collect_list_range']).'/';
+                if (preg_match($pattern, $item, $matches)){
                     return $item;
                 }
             });

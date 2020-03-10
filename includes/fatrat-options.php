@@ -356,7 +356,7 @@ class FRC_Configuration_List_Table extends WP_List_Table
             'collect_remove_outer_link' => $collect_remove_outer_link,
             'collect_remove_head' => $collect_remove_head,
             'collect_list_url' => $collect_list_url,
-            'collect_list_range' => $collect_list_range,
+            'collect_list_range' => str_replace("\\\\", "\\", $collect_list_range),
             'collect_list_rules' => $collect_list_rules,
             'collect_content_range' => $collect_content_range,
             'collect_content_rules' => $collect_content_rules,
