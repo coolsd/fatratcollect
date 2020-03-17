@@ -195,6 +195,7 @@ function frc_more_schedules() {
         'everytenminutes' => array('interval' => 600, 'display' => 'Every Ten Minutes'),
         'twohourly' => array('interval' => 7200, 'display' => 'Two Hourly'),
         'everyhalfhour' => array('interval' => 1800, 'display' => 'Every Half Hour'),
+        'everyhour' => array('interval' => 3600, 'display' => 'Every Hour'),
     );
 }
 add_filter('cron_schedules', 'frc_more_schedules');

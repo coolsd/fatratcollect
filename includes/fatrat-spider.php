@@ -736,7 +736,7 @@ function rulesFormat($rules)
  * 定时爬取 cron
  */
 if (!wp_next_scheduled('frc_cron_spider_hook')) {
-    wp_schedule_event(time(), 'twicedaily', 'frc_cron_spider_hook');
+    wp_schedule_event(time(), 'everyhour', 'frc_cron_spider_hook');
 }
 
 
@@ -745,6 +745,9 @@ function frc_spider_timing_task()
     $frc_spider = new FRC_Spider();
     $options = $frc_spider->get_option_list();
     foreach ($options as $option){
+        if ($option->collect_type == 'keyword'){
+            continue;
+        }
         $frc_spider->run_spider_list_page($option);
     }
 }
